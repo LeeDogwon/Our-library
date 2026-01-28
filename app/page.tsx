@@ -1,46 +1,44 @@
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged, signInAnonymously} from 'firebase/auth';
+import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { getFirestore, collection, addDoc, updateDoc, doc, onSnapshot, query, setDoc, deleteDoc } from 'firebase/firestore';
-import { Book, Plus, Save, ChevronLeft, Trash2, Heart, MessageCircle, User, Send, Hash, ArrowLeft, MessageSquarePlus, X, RotateCcw, Trash, Sparkles, CheckCircle, BookOpen } from 'lucide-react';
+import { Book, Plus, ChevronLeft, Trash2, Heart, MessageCircle, User, Send, Hash, ArrowLeft, Trash, Sparkles, CheckCircle, BookOpen, RotateCcw } from 'lucide-react';
 
 // --- Firebase Configuration ---
-// Vercel 환경 변수에서 설정값을 가져옵니다. 
-// 값이 없을 경우를 대비해 빈 객체({})를 기본값으로 둡니다.
+// Vercel 환경 변수나 빈 객체를 사용
 const firebaseConfig = JSON.parse(process.env.NEXT_PUBLIC_FIREBASE_CONFIG || '{}');
 
-const app = initializeApp(firebaseConfig);
+// 초기화 전 config가 비어있으면 에러가 날 수 있으므로 체크 (클라이언트 사이드 안전장치)
+const app = Object.keys(firebaseConfig).length > 0 ? initializeApp(firebaseConfig) : initializeApp({ apiKey: "fake-key", projectId: "fake-id" }); 
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// appId는 프로젝트를 구분하는 고유 이름입니다.
 const appId = 'our-library'; 
 
 export default function App() {
-  const [user, setUser] = useState(null);
+  // TypeScript 에러 방지를 위해 <any> 타입 명시
+  const [user, setUser] = useState<any>(null);
   const [view, setView] = useState('home'); 
-  const [books, setBooks] = useState([]);
-  const [allProgress, setAllProgress] = useState([]);
-  const [allMessages, setAllMessages] = useState([]);
-  const [selectedBook, setSelectedBook] = useState(null);
-  const [activeTopicPage, setActiveTopicPage] = useState(null); 
+  const [books, setBooks] = useState<any[]>([]);
+  const [allProgress, setAllProgress] = useState<any[]>([]);
+  const [allMessages, setAllMessages] = useState<any[]>([]);
+  const [selectedBook, setSelectedBook] = useState<any>(null);
+  const [activeTopicPage, setActiveTopicPage] = useState<any>(null); 
   const [loading, setLoading] = useState(true);
 
-  const [swipedBookId, setSwipedBookId] = useState(null);
+  const [swipedBookId, setSwipedBookId] = useState<any>(null);
   const [formInput, setFormInput] = useState({ title: '', author: '', totalPages: '' });
   const [chatInput, setChatInput] = useState('');
   const [newPageTopic, setNewPageTopic] = useState('');
 
   // 1. Authentication
   useEffect(() => {
-        const initAuth = async () => {
+    const initAuth = async () => {
       try {
-        // 불필요한 토큰 확인을 없애고 바로 익명 로그인을 실행합니다.
         await signInAnonymously(auth);
       } catch (err) { console.error("Auth Error:", err); }
     };
-
     initAuth();
     const unsubscribe = onAuthStateChanged(auth, setUser);
     return () => unsubscribe();
@@ -50,17 +48,20 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
 
+    // 책 데이터 가져오기 (생성일 기준 내림차순 정렬)
     const bQuery = query(collection(db, 'artifacts', appId, 'public', 'data', 'books'));
     const unsubBooks = onSnapshot(bQuery, (snap) => {
-      setBooks(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a : any ,b : any) => b.createdAt - a.createdAt));
+      setBooks(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => b.createdAt - a.createdAt));
     }, (err) => console.error("Books Sync Error:", err));
 
+    // 진도표 가져오기
     const pQuery = query(collection(db, 'artifacts', appId, 'public', 'data', 'progress'));
     const unsubProg = onSnapshot(pQuery, (snap) => {
       setAllProgress(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
     });
 
+    // 메시지 가져오기
     const mQuery = query(collection(db, 'artifacts', appId, 'public', 'data', 'messages'));
     const unsubMessages = onSnapshot(mQuery, (snap) => {
       setAllMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -69,22 +70,24 @@ export default function App() {
     return () => { unsubBooks(); unsubProg(); unsubMessages(); };
   }, [user]);
 
+  // 토론 주제 계산 (에러가 가장 많이 나던 부분 수정 완료)
   const currentTopics = useMemo(() => {
     if (!selectedBook) return [];
-    const msgs = allMessages.filter(m => m.bookId === selectedBook.id);
-    return [...new Set(msgs.map(m => m.page))].sort((a, b) => a - b);
+    const msgs = allMessages.filter((m: any) => m.bookId === selectedBook.id);
+    // [FIX] Set Iteration Error 해결: Array.from 사용
+    return Array.from(new Set(msgs.map((m: any) => m.page))).sort((a: any, b: any) => a - b);
   }, [allMessages, selectedBook]);
 
-  const getMyProg = (bid) => allProgress.find(p => p.bookId === bid && p.userId === user?.uid) || { currentPage: 0 };
-  const getPartnerProg = (bid) => allProgress.find(p => p.bookId === bid && p.userId !== user?.uid);
+  const getMyProg = (bid: string) => allProgress.find((p: any) => p.bookId === bid && p.userId === user?.uid) || { currentPage: 0 };
+  const getPartnerProg = (bid: string) => allProgress.find((p: any) => p.bookId === bid && p.userId !== user?.uid);
 
-  // 3. Logic: Book Sorting (Both must finish for 'Completed')
+  // 3. Logic: Book Sorting
   const filteredBooks = useMemo(() => {
-    const active = books.filter(b => !b.isDeleted);
-    const reading = [];
-    const completed = [];
+    const active = books.filter((b: any) => !b.isDeleted);
+    const reading: any[] = [];
+    const completed: any[] = [];
     
-    active.forEach(b => {
+    active.forEach((b: any) => {
       const my = getMyProg(b.id);
       const partner = getPartnerProg(b.id) || { currentPage: 0 };
       
@@ -95,12 +98,14 @@ export default function App() {
       }
     });
 
-    return { reading, completed, trash: books.filter(b => b.isDeleted) };
+    return { reading, completed, trash: books.filter((b: any) => b.isDeleted) };
   }, [books, allProgress, user]);
 
   // 4. Handlers
-  const handleAddBook = async (e) => {
+  const handleAddBook = async (e: any) => {
     e.preventDefault();
+    if (!user) return; // 안전장치
+
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'books'), {
         ...formInput,
@@ -114,10 +119,12 @@ export default function App() {
     } catch (err) { console.error(err); }
   };
 
-  const handleUpdateProgress = async (e) => {
+  const handleUpdateProgress = async (e: any) => {
     e.preventDefault();
+    if (!user || !selectedBook) return;
+
     const fd = new FormData(e.target);
-    const updatedPage = parseInt(fd.get('currentPage'));
+    const updatedPage = parseInt(fd.get('currentPage') as string);
     if (updatedPage > selectedBook.totalPages) return;
 
     const progressId = `${selectedBook.id}_${user.uid}`;
@@ -133,7 +140,7 @@ export default function App() {
     } catch (err) { console.error(err); }
   };
 
-  const moveToTrash = async (id) => {
+  const moveToTrash = async (id: string) => {
     try {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'books', id), {
         isDeleted: true,
@@ -143,7 +150,7 @@ export default function App() {
     } catch (err) { console.error(err); }
   };
 
-  const restoreBook = async (id) => {
+  const restoreBook = async (id: string) => {
     try {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'books', id), {
         isDeleted: false,
@@ -152,16 +159,16 @@ export default function App() {
     } catch (err) { console.error(err); }
   };
 
-  const permanentDelete = async (id) => {
+  const permanentDelete = async (id: string) => {
     if (!window.confirm("우리의 기록이 영구히 삭제됩니다. 정말 지울까요?")) return;
     try {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'books', id));
     } catch (err) { console.error(err); }
   };
 
-  const sendMessage = async (e) => {
+  const sendMessage = async (e: any) => {
     e.preventDefault();
-    if (!chatInput.trim()) return;
+    if (!user || !selectedBook || !chatInput.trim()) return;
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), {
         bookId: selectedBook.id,
@@ -174,9 +181,9 @@ export default function App() {
     } catch (err) { console.error(err); }
   };
 
-  const createTopic = async (e) => {
+  const createTopic = async (e: any) => {
     e.preventDefault();
-    if (!newPageTopic) return;
+    if (!selectedBook || !newPageTopic) return;
     const pageNum = parseInt(newPageTopic);
     if (pageNum > selectedBook.totalPages) return;
 
@@ -193,17 +200,17 @@ export default function App() {
     } catch (err) { console.error(err); }
   };
 
-  const SwipeableCard = ({ book, children }) => {
+  const SwipeableCard = ({ book, children }: any) => {
     const [startX, setStartX] = useState(0);
     const [currentX, setCurrentX] = useState(0);
     const isSwiped = swipedBookId === book.id;
 
-    const onTouchStart = (e) => {
+    const onTouchStart = (e: any) => {
       setStartX(e.touches[0].clientX);
       setSwipedBookId(null);
     };
 
-    const onTouchMove = (e) => {
+    const onTouchMove = (e: any) => {
       const diff = e.touches[0].clientX - startX;
       if (diff < 0) setCurrentX(diff);
     };
@@ -328,7 +335,7 @@ export default function App() {
                 <p className="text-[10px] font-bold uppercase tracking-widest">Our shelf is waiting for a new story</p>
               </div>
             ) : (
-              filteredBooks.reading.map(book => {
+              filteredBooks.reading.map((book: any) => {
                 const my = getMyProg(book.id);
                 const partner = getPartnerProg(book.id) || { currentPage: 0 };
                 const myPct = Math.min(Math.round((my.currentPage / book.totalPages) * 100), 100) || 0;
@@ -397,7 +404,7 @@ export default function App() {
                 <p className="text-[10px] font-bold uppercase tracking-widest">No shared completions yet</p>
               </div>
             ) : (
-              filteredBooks.completed.map(book => (
+              filteredBooks.completed.map((book: any) => (
                 <div key={book.id} onClick={() => {setSelectedBook(book); setView('edit');}} className="group bg-slate-900/40 border border-emerald-500/20 p-6 rounded-[2.5rem] flex justify-between items-center cursor-pointer hover:border-emerald-500/40 transition-all shadow-xl">
                   <div className="min-w-0 pr-4">
                     <h3 className="font-bold text-slate-200 truncate group-hover:text-emerald-400 transition-colors">{book.title}</h3>
@@ -427,7 +434,7 @@ export default function App() {
             {filteredBooks.trash.length === 0 ? (
               <p className="text-center py-20 text-slate-700 text-[10px] font-black uppercase tracking-widest">Trash is Empty</p>
             ) : (
-              filteredBooks.trash.map(book => (
+              filteredBooks.trash.map((book: any) => (
                 <div key={book.id} className="bg-slate-900/50 border border-slate-800 p-5 rounded-[2rem] flex justify-between items-center shadow-lg">
                   <div className="min-w-0 pr-4">
                     <h3 className="font-bold text-slate-300 truncate">{book.title}</h3>
@@ -506,7 +513,7 @@ export default function App() {
               </form>
             </div>
 
-            {/* Threaded Discussions: ENLARGED Page Placeholder and Box */}
+            {/* Threaded Discussions */}
             {!activeTopicPage ? (
               <div className="bg-slate-900 border border-slate-800 p-8 rounded-[3rem] shadow-xl">
                 <div className="flex items-center gap-3 mb-10">
@@ -516,7 +523,7 @@ export default function App() {
                   <h3 className="font-black text-[11px] uppercase tracking-[0.3em] text-slate-400">Page Discussion</h3>
                 </div>
 
-                {/* Larger Topic Creation Input */}
+                {/* Topic Creation Input */}
                 <form onSubmit={createTopic} className="flex gap-4 mb-12">
                   <div className="relative flex-1">
                     <Hash size={16} className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500" />
@@ -534,12 +541,11 @@ export default function App() {
                   </button>
                 </form>
 
-                {/* Enlarged Topic Tabs */}
+                {/* Topic Tabs */}
                 <div className="space-y-5">
-                  {currentTopics.map(p => (
+                  {currentTopics.map((p: any) => (
                     <button key={p} onClick={() => setActiveTopicPage(p)} className="w-full flex items-center justify-between bg-slate-950 border border-slate-800/40 p-6 rounded-[2.5rem] hover:border-indigo-500/50 hover:bg-slate-800/20 transition-all group shadow-md active:scale-95">
                       <div className="flex items-center gap-6 min-w-0">
-                        {/* Larger Page Box (w-16 h-16) */}
                         <div className="w-16 h-16 bg-indigo-500/10 rounded-[1.25rem] flex items-center justify-center text-indigo-400 font-black text-2xl border-2 border-indigo-500/20 flex-shrink-0 group-hover:scale-110 transition-transform shadow-inner font-mono">
                           {p}
                         </div>
@@ -569,16 +575,15 @@ export default function App() {
                   <button onClick={() => setActiveTopicPage(null)} className="flex items-center gap-2 text-indigo-400 text-[10px] font-black uppercase tracking-widest hover:text-white transition-all bg-indigo-500/5 px-5 py-2.5 rounded-full border border-indigo-500/10"><ArrowLeft size={14}/> 목록</button>
                   <div className="flex items-center gap-3">
                     <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Page</span>
-                    {/* Enlarged Badge in Chat room */}
                     <span className="w-14 h-14 bg-indigo-600/10 border-2 border-indigo-500/30 rounded-2xl flex items-center justify-center text-indigo-400 font-black text-xl shadow-lg font-mono">{activeTopicPage}</span>
                   </div>
                 </div>
 
                 <div className="space-y-6 mb-10 h-[400px] overflow-y-auto pr-2 custom-scrollbar flex flex-col pt-2">
                   {allMessages
-                    .filter(m => m.bookId === selectedBook.id && m.page === activeTopicPage)
-                    .sort((a,b) => a.createdAt - b.createdAt)
-                    .map((m, i) => (
+                    .filter((m: any) => m.bookId === selectedBook.id && m.page === activeTopicPage)
+                    .sort((a: any, b: any) => a.createdAt - b.createdAt)
+                    .map((m: any, i: number) => (
                       <div key={i} className={`flex flex-col ${m.userId === 'system' ? 'items-center' : m.userId === user.uid ? 'items-end' : 'items-start'}`}>
                         {m.userId === 'system' ? (
                           <div className="bg-slate-800/30 text-[9px] font-bold text-slate-500 px-6 py-2 rounded-full my-6 uppercase border border-slate-800 tracking-tighter shadow-sm">{m.message}</div>
@@ -643,8 +648,8 @@ export default function App() {
   );
 }
 
-// Utility icon
-function BarChart2(props) {
+// Utility icon (BarChart2)
+function BarChart2(props: any) {
   return (
     <svg
       {...props}
