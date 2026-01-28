@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, signInAnonymously} from 'firebase/auth';
 import { getFirestore, collection, addDoc, updateDoc, doc, onSnapshot, query, setDoc, deleteDoc } from 'firebase/firestore';
 import { Book, Plus, Save, ChevronLeft, Trash2, Heart, MessageCircle, User, Send, Hash, ArrowLeft, MessageSquarePlus, X, RotateCcw, Trash, Sparkles, CheckCircle, BookOpen } from 'lucide-react';
 
@@ -34,15 +34,13 @@ export default function App() {
 
   // 1. Authentication
   useEffect(() => {
-    const initAuth = async () => {
+        const initAuth = async () => {
       try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
+        // 불필요한 토큰 확인을 없애고 바로 익명 로그인을 실행합니다.
+        await signInAnonymously(auth);
       } catch (err) { console.error("Auth Error:", err); }
     };
+
     initAuth();
     const unsubscribe = onAuthStateChanged(auth, setUser);
     return () => unsubscribe();
