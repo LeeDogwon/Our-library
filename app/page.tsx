@@ -52,7 +52,7 @@ export default function App() {
 
     const bQuery = query(collection(db, 'artifacts', appId, 'public', 'data', 'books'));
     const unsubBooks = onSnapshot(bQuery, (snap) => {
-      setBooks(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => b.createdAt - a.createdAt));
+      setBooks(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a : any ,b : any) => b.createdAt - a.createdAt));
     }, (err) => console.error("Books Sync Error:", err));
 
     const pQuery = query(collection(db, 'artifacts', appId, 'public', 'data', 'progress'));
