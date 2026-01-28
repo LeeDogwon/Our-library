@@ -6,13 +6,21 @@ import { getFirestore, collection, addDoc, updateDoc, doc, onSnapshot, query, se
 import { Book, Plus, ChevronLeft, Trash2, Heart, MessageCircle, User, Send, Hash, ArrowLeft, Trash, Sparkles, CheckCircle, BookOpen, RotateCcw } from 'lucide-react';
 
 // --- Firebase Configuration ---
-// Vercel 환경 변수나 빈 객체를 사용
-const firebaseConfig = JSON.parse(process.env.NEXT_PUBLIC_FIREBASE_CONFIG || '{}');
+// 복잡한 설정 대신 직접 입력하여 오류를 해결합니다.
+const firebaseConfig = {
+  apiKey: "AIzaSyBRTjwx7Wjkn_3f7bNvT3WHedf8VqYMKtc",
+  authDomain: "dgjh-b336e.firebaseapp.com",
+  projectId: "dgjh-b336e",
+  storageBucket: "dgjh-b336e.firebasestorage.app",
+  messagingSenderId: "517198656707",
+  appId: "1:517198656707:web:61ee0e4838dbce33131e76",
+  measurementId: "G-3376DN8MW1"
+};
 
-// 초기화 전 config가 비어있으면 에러가 날 수 있으므로 체크 (클라이언트 사이드 안전장치)
-const app = Object.keys(firebaseConfig).length > 0 ? initializeApp(firebaseConfig) : initializeApp({ apiKey: "fake-key", projectId: "fake-id" }); 
+const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
 
 const appId = 'our-library'; 
 
